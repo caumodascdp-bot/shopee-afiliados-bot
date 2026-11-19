@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: shopee-afiliados-bot
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: npm ci --omit=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: "3850"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SHOPEE_APP_ID
+        sync: false
+      - key: SHOPEE_SECRET_KEY
+        sync: false
+      - key: DEFAULT_SUB_ID
+        value: whatsapp_grupos
+      - key: SESSION_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: PING_SECRET
+        sync: false

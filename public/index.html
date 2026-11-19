@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Shopee Afiliados Bot — Painel</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- TELA DE LOGIN -->
+  <main id="loginView" class="auth-shell">
+    <section class="auth-card">
+      <div class="brand-badge">SHOPEE AFILIADOS</div>
+      <h1>Acesso ao Painel</h1>
+      <p class="muted">Entre com a senha administrativa para gerenciar WhatsApp, Shopee e ofertas.</p>
+      <form id="loginForm" class="stack-form">
+        <label class="field">
+          <span>Usuário</span>
+          <input type="text" id="loginUsername" value="admin" autocomplete="username" required>
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input type="password" id="loginPassword" placeholder="Digite sua senha" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="btn btn-primary btn-full">Entrar no Painel</button>
+      </form>
+      <p id="loginError" class="alert alert-error hidden"></p>
+    </section>
+  </main>
+
+  <!-- TELA DE TROCA OBRIGATÓRIA DE SENHA PROVISÓRIA -->
+  <main id="changePasswordView" class="auth-shell hidden">
+    <section class="auth-card">
+      <div class="brand-badge warn">PRIMEIRO ACESSO</div>
+      <h1>Troca Obrigatória de Senha</h1>
+      <p class="muted">Por segurança, você precisa substituir a senha provisória antes de usar o painel.</p>
+      <form id="changePasswordForm" class="stack-form">
+        <label class="field">
+          <span>Senha provisória atual</span>
+          <input type="password" id="currentPasswordInput" required autocomplete="current-password">
+        </label>
+        <label class="field">
+          <span>Nova senha (mínimo 8 caracteres)</span>
+          <input type="password" id="newPasswordInput" minlength="8" required autocomplete="new-password">
+        </label>
+        <label class="field">
+          <span>Confirmar nova senha</span>
+          <input type="password" id="confirmNewPasswordInput" minlength="8" required autocomplete="new-password">
+        </label>
+        <button type="submit" class="btn btn-primary btn-full">Salvar Nova Senha e Liberar Painel</button>
+      </form>
+      <p id="changePasswordError" class="alert alert-error hidden"></p>
+    </section>
+  </main>
+
+  <!-- PAINEL PRINCIPAL (5 ABAS) -->
+  <div id="appShell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="dot" id="headerWaDot"></span>
+        <div>
+          <strong>Shopee Afiliados</strong>
+          <small id="headerWaText" class="muted">Desconectado</small>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" id="refreshAllBtn" class="btn btn-ghost btn-sm">Atualizar</button>
+        <button type="button" id="logoutBtn" class="btn btn-ghost btn-sm">Sair</button>
+      </div>
+    </header>
+
+    <nav class="tabbar" aria-label="Navegação principal">
+      <button type="button" class="tab-btn active" data-tab="whatsapp">1. WhatsApp</button>
+      <button type="button" class="tab-btn" data-tab="shopee">2. Shopee</button>
+      <button type="button" class="tab-btn" data-tab="groups">3. Grupos</button>
+      <button type="button" class="tab-btn" data-tab="hunter">4. Caçador</button>
+      <button type="button" class="tab-btn" data-tab="converter">5. Conversor</button>
+    </nav>
+
+    <main class="content">
+      <!-- ABA 1: WHATSAPP -->
+      <section id="tab-whatsapp" class="tab-panel active">
+        <div class="card">
+          <div class="card-head">
+            <h2>Conexão WhatsApp (Baileys)</h2>
+            <span id="waStatusBadge" class="pill">OFFLINE</span>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Número conectado</span>
+              <strong id="waPhoneValue">—</strong>
+            </div>
+            <div class="info-item">
+              <span class="label">Sessão</span>
+              <strong id="waSessionIdValue">—</strong>
+            </div>
+            <div class="info-item">
+              <span class="label">Conectado em</span>
+              <strong id="waConnectedAtValue">—</strong>
+            </div>
+            <div class="info-item">
+              <span class="label">Reconexões</span>
+              <strong id="waReconnectValue">0</strong>
+            </div>
+          </div>
+
+          <p id="waErrorBox" class="alert alert-error hidden"></p>
+
+          <div id="waQrBox" class="qr-box hidden">
+            <p class="muted">Abra o WhatsApp no celular → Aparelhos conectados → Conectar aparelho:</p>
+            <img id="waQrImg" alt="QR Code do WhatsApp">
+          </div>
+
+          <div class="btn-row">
+            <button type="button" id="waConnectBtn" class="btn btn-primary">Conectar / Gerar QR</button>
+            <button type="button" id="waDisconnectBtn" class="btn btn-secondary">Desconectar</button>
+            <button type="button" id="waSwitchBtn" class="btn btn-danger">Trocar Número</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Saúde e Fila em Tempo Real</h3>
+          <div id="systemSummary" class="status-list muted">Carregando status...</div>
+        </div>
+      </section>
+
+      <!-- ABA 2: SHOPEE -->
+      <section id="tab-shopee" class="tab-panel">
+        <div class="card">
+          <div class="card-head">
+            <h2>Credenciais Shopee Brasil (Open API)</h2>
+            <span id="shopeeStatusBadge" class="pill">Não testada</span>
+          </div>
+          <form id="shopeeConfigForm" class="stack-form">
+            <label class="field">
+              <span>App ID</span>
+              <input type="text" id="shopeeAppId" placeholder="Ex.: 1834567890" required>
+            </label>
+            <label class="field">
+              <span>Secret Key <small id="shopeeSecretHint" class="muted"></small></span>
+              <input type="password" id="shopeeSecretKey" placeholder="Cole a nova Secret Key ou deixe vazio para manter">
+            </label>
+            <label class="field">
+              <span>Sub ID Padrão</span>
+              <input type="text" id="shopeeDefaultSubId" placeholder="whatsapp_grupos">
+            </label>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-primary">Salvar Credenciais</button>
+              <button type="button" id="shopeeTestBtn" class="btn btn-secondary">Testar Conexão Shopee</button>
+            </div>
+          </form>
+          <p id="shopeeTestResult" class="alert hidden"></p>
+        </div>
+
+        <div class="card">
+          <h3>Consulta Rápida na API Shopee</h3>
+          <form id="shopeeSearchForm" class="inline-form">
+            <input type="text" id="shopeeSearchKeyword" placeholder="Buscar produto (ex.: air fryer)" required>
+            <button type="submit" class="btn btn-secondary">Consultar</button>
+          </form>
+          <div id="shopeeSearchResults" class="list-cards"></div>
+        </div>
+      </section>
+
+      <!-- ABA 3: GRUPOS E ESPELHAMENTO -->
+      <section id="tab-groups" class="tab-panel">
+        <div class="card">
+          <div class="card-head">
+            <h2>Regras de Espelhamento</h2>
+            <button type="button" id="syncGroupsBtn" class="btn btn-secondary btn-sm">Sincronizar Grupos</button>
+          </div>
+          <form id="mirrorConfigForm" class="stack-form">
+            <label class="toggle-row">
+              <input type="checkbox" id="mirrorEnabled">
+              <span>Ativar monitoramento e espelhamento de grupos-fonte</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" id="privateConverterEnabled">
+              <span>Responder links da Shopee enviados no privado deste WhatsApp</span>
+            </label>
+            <label class="toggle-row">
+              <input type="checkbox" id="mirrorIncludeImage" checked>
+              <span>Enviar imagem da oferta quando disponível</span>
+            </label>
+            <div class="two-col">
+              <label class="field">
+                <span>Bloqueio de repetidas (horas)</span>
+                <input type="number" id="mirrorDedupHours" min="1" max="168" value="12">
+              </label>
+              <label class="field">
+                <span>Sub ID do espelhamento</span>
+                <input type="text" id="mirrorSubId" placeholder="Opcional">
+              </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Salvar Regras de Espelhamento</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Grupos Disponíveis</h3>
+          <p class="muted">Marque os grupos que o robô deve observar (Origem) e onde deve publicar (Destino).</p>
+          <div id="groupsList" class="list-cards"></div>
+        </div>
+      </section>
+
+      <!-- ABA 4: CAÇADOR AUTOMÁTICO -->
+      <section id="tab-hunter" class="tab-panel">
+        <div class="card">
+          <div class="card-head">
+            <h2>Caçador Automático de Ofertas</h2>
+            <span id="hunterStatusBadge" class="pill">PAUSADO</span>
+          </div>
+          <form id="hunterConfigForm" class="stack-form">
+            <div class="two-col">
+              <label class="field">
+                <span>Comissão mínima (%)</span>
+                <input type="number" id="hunterMinCommission" min="0" max="100" step="0.5" value="5">
+              </label>
+              <label class="field">
+                <span>Intervalo (minutos)</span>
+                <input type="number" id="hunterIntervalMinutes" min="10" max="1440" value="60">
+              </label>
+              <label class="field">
+                <span>Preço mínimo (R$)</span>
+                <input type="number" id="hunterMinPrice" min="0" step="1" value="0">
+              </label>
+              <label class="field">
+                <span>Preço máximo (R$)</span>
+                <input type="number" id="hunterMaxPrice" min="0" step="1" value="0">
+              </label>
+              <label class="field">
+                <span>Vendas mínimas</span>
+                <input type="number" id="hunterMinSales" min="0" step="1" value="0">
+              </label>
+              <label class="field">
+                <span>Máx. ofertas por ciclo</span>
+                <input type="number" id="hunterMaxPerRun" min="1" max="10" value="3">
+              </label>
+            </div>
+            <label class="field">
+              <span>Sub ID do caçador</span>
+              <input type="text" id="hunterSubId" value="cacador_auto">
+            </label>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-primary">Salvar Filtros</button>
+              <button type="button" id="hunterToggleBtn" class="btn btn-secondary">Ligar Piloto Automático</button>
+              <button type="button" id="hunterRunOnceBtn" class="btn btn-ghost">Buscar Agora (Teste)</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Palavras-Chave do Caçador</h3>
+          <form id="keywordForm" class="inline-form">
+            <input type="text" id="newKeywordInput" placeholder="Ex.: organizador cozinha, air fryer" required>
+            <button type="submit" class="btn btn-primary">Adicionar</button>
+          </form>
+          <div id="keywordsList" class="chip-list"></div>
+        </div>
+
+        <div class="card">
+          <h3>Últimas Ofertas Encontradas</h3>
+          <div id="hunterOffersList" class="list-cards"></div>
+        </div>
+      </section>
+
+      <!-- ABA 5: CONVERSOR RÁPIDO -->
+      <section id="tab-converter" class="tab-panel">
+        <div class="card">
+          <h2>Conversor Rápido de Links Shopee</h2>
+          <p class="muted">Cole qualquer link da Shopee (completo ou curto) para gerar o link de afiliado e a mensagem pronta.</p>
+          <form id="converterForm" class="stack-form">
+            <label class="field">
+              <span>Link da Shopee</span>
+              <input type="url" id="converterUrlInput" placeholder="https://shopee.com.br/... ou https://s.shopee.com.br/..." required>
+            </label>
+            <label class="field">
+              <span>Sub ID (opcional)</span>
+              <input type="text" id="converterSubIdInput" placeholder="stories_hoje">
+            </label>
+            <button type="submit" class="btn btn-primary">Converter e Gerar Oferta</button>
+          </form>
+        </div>
+
+        <div id="converterResultCard" class="card hidden">
+          <div class="card-head">
+            <h3>Oferta Pronta</h3>
+            <button type="button" id="copyConvertedBtn" class="btn btn-primary btn-sm">Copiar Mensagem</button>
+          </div>
+          <div class="converted-preview">
+            <img id="convertedImage" class="preview-img hidden" alt="Imagem do produto">
+            <div class="converted-meta">
+              <strong id="convertedTitle"></strong>
+              <span id="convertedLink" class="mono"></span>
+            </div>
+          </div>
+          <textarea id="convertedMessageBox" rows="7" readonly></textarea>
+        </div>
+
+        <div class="card">
+          <h3>Histórico de Conversões</h3>
+          <div id="converterHistoryList" class="list-cards"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

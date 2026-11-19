@@ -1,0 +1,11 @@
+{
+  "name": "shopee-afiliados-keepalive-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker exclusivo para Keep-Alive a cada 10 minutos do Shopee Afiliados Bot.",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  }
+}

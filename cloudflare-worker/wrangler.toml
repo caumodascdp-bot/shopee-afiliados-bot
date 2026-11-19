@@ -1,0 +1,13 @@
+name = "shopee-afiliados-keepalive"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+# Preencha com a URL HTTPS do seu serviço no Render antes de publicar
+RENDER_BASE_URL = "https://SEU-SERVICO-NO-RENDER.onrender.com"
+
+# IMPORTANTE: nunca coloque PING_SECRET aqui!
+# Cadastre com: npx wrangler secret put PING_SECRET

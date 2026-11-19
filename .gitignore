@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+logs/*.log
+.baileys_auth/
+tmp/
+*.pid
+coverage/
+docs/Guia_Completo_Uso_Shopee_Afiliados_Bot.pdf
+docs/guia_uso_leigo.html
+docs/PROMPT_MESTRE_SHOPEE_AFILIADOS.md
+STATUS.md
+RELATORIO_TESTES.md

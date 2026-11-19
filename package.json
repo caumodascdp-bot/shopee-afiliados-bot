@@ -1,0 +1,31 @@
+{
+  "name": "shopee-afiliados-bot",
+  "version": "1.0.0",
+  "description": "Plataforma leve de automação para afiliados da Shopee Brasil com Baileys, Neon PostgreSQL, Upstash Redis e painel mobile.",
+  "main": "index.js",
+  "license": "SEE LICENSE IN docs/THIRD_PARTY_LICENSES.md",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "migrate": "node scripts/run-migrations.js",
+    "build": "node scripts/build-check.js",
+    "test": "NODE_ENV=test node --test tests/*.test.js",
+    "hash-password": "node scripts/hash-password.js",
+    "measure-memory": "node scripts/measure-memory.js",
+    "smoke-check": "node scripts/smoke-check.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "dotenv": "^16.4.7",
+    "express": "^4.22.1",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^7.1.0",
+    "pg": "^8.13.1",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4",
+    "redis": "^4.7.0"
+  }
+}
