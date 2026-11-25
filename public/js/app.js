@@ -96,7 +96,7 @@
       $('systemSummary').innerHTML = [
         `RAM atual (RSS): <strong>${h.memoryMb?.rss ?? '?'} MB</strong> (Heap: ${h.memoryMb?.heapUsed ?? '?'} MB)`,
         `Banco: <strong>${pgTxt}</strong> • Cache/Fila: <strong>${rdTxt}</strong>`,
-        `Fila pendente: <strong>${h.queue?.pending ?? 0}</strong> • Enviadas: <strong>${h.queue?.sent ?? 0}</strong> • Falhas definitivas: <strong>${h.queue?.dead_letter ?? 0}</strong>`,
+        `Fila pendente: <strong>${h.queue?.pending ?? 0}</strong> • Aguardando recibo: <strong>${h.queue?.awaiting_receipt ?? 0}</strong> • Com recibo: <strong>${h.queue?.delivered ?? 0}</strong> • Registradas sem recibo: <strong>${h.queue?.sent ?? 0}</strong> • Falhas definitivas: <strong>${h.queue?.dead_letter ?? 0}</strong>`,
       ].join('<br>');
     } catch (err) {
       $('systemSummary').textContent = err.message;

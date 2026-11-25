@@ -605,6 +605,44 @@ class Repository {
     return { ...job };
   }
 
+  async reserveWhatsAppMessage(jobId, messageId) {
+    if (this.usePg()) {
+      const result = await this.pg.query(
+        `UPDATE queue_jobs SET status='awaiting_receipt', whatsapp_message_id=$2, updated_at=now()
+         WHERE id=$1 AND status='processing' RETURNING id`, [jobId, messageId]);
+      return result.rowCount === 1;
+    }
+    const job = this._memory.queueJobs.find(j => j.id === jobId && j.status === 'processing');
+    if (!job) return false;
+    Object.assign(job, { status: 'awaiting_receipt', whatsapp_message_id: messageId });
+    return true;
+  }
+
+  async recordWhatsAppReceipt(jid, messageId, rejection = '') {
+    const status = rejection ? 'dead_letter' : 'delivered';
+    const publication = rejection ? 'failed' : 'sent';
+    if (this.usePg()) {
+      const result = await this.pg.query(
+        `WITH changed AS (
+           UPDATE queue_jobs SET status=$3::varchar, updated_at=now(), last_error=$4::text,
+             sent_at=CASE WHEN $3::varchar='delivered' THEN now() ELSE NULL END
+           WHERE destination_jid=$1 AND whatsapp_message_id=$2 AND status='awaiting_receipt'
+           RETURNING id, offer_id, destination_jid, whatsapp_message_id
+         ) INSERT INTO publications_history(job_id,offer_id,destination_jid,whatsapp_msg_id,status,error_message)
+           SELECT id,offer_id,destination_jid,whatsapp_message_id,$5,$4::text FROM changed`,
+        [jid, messageId, status, rejection, publication]);
+      return result.rowCount === 1;
+    }
+    const job = this._memory.queueJobs.find(j => j.destination_jid === jid &&
+      j.whatsapp_message_id === messageId && j.status === 'awaiting_receipt');
+    if (!job) return false;
+    const now = new Date().toISOString();
+    Object.assign(job, { status, last_error: rejection, updated_at: now, sent_at: rejection ? null : now });
+    this._memory.publications.push({ id: this._memory.seq.pub++, job_id: job.id, offer_id: job.offer_id,
+      destination_jid: jid, whatsapp_msg_id: messageId, status: publication, error_message: rejection, published_at: now });
+    return true;
+  }
+
   async markJobSent(jobId, whatsappMsgId = '') {
     if (this.usePg()) {
       return this.pg.withTransaction(async (client) => {

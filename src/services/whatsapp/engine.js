@@ -6,6 +6,7 @@
 const EventEmitter = require('events');
 const pino = require('pino');
 const qrcode = require('qrcode');
+const { groupDiagnostics } = require('./delivery_diagnostics');
 const logger = require('../../utils/logger');
 const { sleep } = require('../../utils/delay');
 const MessageNormalizer = require('./message_normalizer');
@@ -213,6 +214,7 @@ class WhatsAppEngine extends EventEmitter {
       },
     });
 
+    this.inspectGroup = groupDiagnostics(sock, logger, this.repository);
     this.sock = sock;
     this._startLockRenewTimer(sock);
 
@@ -471,6 +473,25 @@ class WhatsAppEngine extends EventEmitter {
     } catch (_) {}
   }
 
+  async prepareGroupText(jid) {
+    const sock = this.sock;
+    if (!sock || this.status !== 'CONNECTED') throw new Error('WhatsApp desconectado.');
+    const metadata = await sock.groupMetadata(jid);
+    const normalize = value => value?.replace(/:\d+@/, '@');
+    const own = [sock.user?.id, sock.user?.lid].filter(Boolean).map(normalize);
+    const member = metadata.participants.find(p =>
+      [p.id, p.phoneNumber, p.lid].some(id => own.includes(normalize(id))));
+    if (metadata.announce && !['admin', 'superadmin'].includes(member?.admin)) {
+      throw new Error('Envio não permitido: grupo exclusivo para administradores.');
+    }
+    const messageId = this.baileysLoader().generateMessageIDV2(sock.user?.id);
+    return { messageId, send: async text => {
+      const sent = await sock.sendMessage(jid, { text, linkPreview: null }, { messageId });
+      if (sent?.key?.id !== messageId) throw new Error('Resposta sem o identificador reservado.');
+      this._markSentId(messageId);
+    } };
+  }
+
   async sendText(jid, text) {
     if (!this.sock || this.status !== 'CONNECTED') {
       throw new Error('WhatsApp desconectado.');
@@ -478,6 +499,7 @@ class WhatsAppEngine extends EventEmitter {
     if (!text || !String(text).trim()) {
       throw new Error('Texto da mensagem não pode estar vazio.');
     }
+    void this.inspectGroup?.(jid);
     const sent = await this.sock.sendMessage(jid, { text: String(text) });
     const msgId = sent?.key?.id || '';
     this._markSentId(msgId);
@@ -499,6 +521,7 @@ class WhatsAppEngine extends EventEmitter {
     } else {
       throw new Error('Fonte de imagem inválida.');
     }
+    void this.inspectGroup?.(jid);
     const sent = await this.sock.sendMessage(jid, {
       image: imagePayload,
       caption: String(caption || ''),

@@ -124,6 +124,24 @@ class MessageDispatcher {
         await this.whatsapp.sendTyping(dest, Math.min(typingMs, 3000));
       }
 
+      // As ofertas do caçador usam texto com link e recibo por grupo.
+      const verified = claimed.idempotency_key?.startsWith('hunter:') && dest.endsWith('@g.us');
+      if (verified) {
+        const submission = await this.whatsapp.prepareGroupText(dest);
+        if (!await this.repository.reserveWhatsAppMessage(claimed.id, submission.messageId)) {
+          return { skipped: true, reason: 'already_reserved' };
+        }
+        try {
+          await submission.send(text);
+        } catch (err) {
+          logger.warn(`[FILA] Resultado incerto no envio #${claimed.id}: ${err.message}`);
+        }
+        // O recibo pode chegar antes do retorno, depois de um timeout ou após reinício.
+        // Nunca repetir a publicação apenas porque ainda falta confirmação.
+        if (!skipDelay) await randomDelay(this.delayMinMs, this.delayMaxMs);
+        return { submitted: true, messageId: submission.messageId };
+      }
+
       let sendResult;
       if (payload.imageBase64) {
         const buf = Buffer.from(payload.imageBase64, 'base64');
