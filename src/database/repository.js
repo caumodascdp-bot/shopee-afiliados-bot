@@ -203,7 +203,7 @@ class Repository {
     if (this.usePg()) {
       const res = await this.pg.query(
         `INSERT INTO whatsapp_groups (jid, name, is_source, is_destination, rules_json)
-         VALUES ($1, COALESCE($2, $1), COALESCE($3, FALSE), COALESCE($4, FALSE), COALESCE($5::jsonb, '{}'::jsonb))
+         VALUES ($1::varchar, COALESCE($2::varchar, $1::varchar), COALESCE($3, FALSE), COALESCE($4, FALSE), COALESCE($5::jsonb, '{}'::jsonb))
          ON CONFLICT (jid) DO UPDATE SET
            name = COALESCE($2, whatsapp_groups.name),
            is_source = COALESCE($3, whatsapp_groups.is_source),

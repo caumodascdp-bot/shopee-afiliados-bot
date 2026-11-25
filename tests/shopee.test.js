@@ -140,3 +140,22 @@ test('Shopee: searchProducts e generateShortLink enviam assinatura válida, ocul
   assert.equal(testErr.code, '10035');
   assert.match(testErr.error, /Open API/);
 });
+
+test('Shopee: tenta novamente erro temporário 10000 em consulta, sem repetir mutação', async () => {
+  let calls = 0;
+  const client = new ShopeeClient({
+    defaultCredentials: { appId: 'app', secretKey: 'secret' },
+    fetchImpl: async () => {
+      calls++;
+      return { ok: true, status: 200, json: async () => calls === 1
+        ? { errors: [{ extensions: { code: 10000 } }] }
+        : { data: { productOfferV2: { nodes: [] } } } };
+    },
+  });
+  const result = await client.searchProducts({ useCache: false });
+  assert.equal(result.offers.length, 0);
+  assert.equal(calls, 2);
+  calls = 0;
+  await assert.rejects(client.generateShortLink({ originUrl: 'https://shopee.com.br/product/1/2' }), { code: '10000' });
+  assert.equal(calls, 1);
+});

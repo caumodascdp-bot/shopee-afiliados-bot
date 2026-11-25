@@ -142,6 +142,10 @@ class OfferHunter {
           ? cfg.destinationJids
           : (await this.repository.listWhatsAppGroups()).filter((g) => g.is_destination).map((g) => g.jid);
 
+      if (cfg.enabled && destinations.length === 0 && selected.length > 0) {
+        logger.warn('[CACADOR] Nenhum grupo de destino configurado; ofertas serão salvas sem envios.');
+      }
+
       let enqueued = 0;
       const savedOffers = [];
 

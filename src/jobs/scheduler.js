@@ -9,6 +9,9 @@ class HunterScheduler {
     this.hunter = hunter;
     this._timer = null;
     this._running = false;
+    this._inFlight = false;
+    this._failures = 0;
+    this._retryAt = 0;
   }
 
   start() {
@@ -24,15 +27,29 @@ class HunterScheduler {
 
   async tick() {
     if (!this._running) return { skipped: true };
-    const cfg = await this.hunter.getConfig();
-    if (!cfg.enabled) return { skipped: true, reason: 'disabled' };
+    if (this._inFlight) return { skipped: true, reason: 'in_flight' };
+    if (Date.now() < this._retryAt) return { skipped: true, reason: 'retry_backoff' };
+    this._inFlight = true;
+    try {
+      const cfg = await this.hunter.getConfig();
+      if (!cfg.enabled) return { skipped: true, reason: 'disabled' };
 
-    const intervalMs = Math.max(10, Number(cfg.intervalMinutes) || 60) * 60 * 1000;
-    const lastMs = cfg.lastRunAt ? Date.parse(cfg.lastRunAt) : 0;
-    if (lastMs && Date.now() - lastMs < intervalMs) {
-      return { skipped: true, reason: 'interval_not_elapsed' };
+      const intervalMs = Math.max(10, Number(cfg.intervalMinutes) || 60) * 60 * 1000;
+      const lastMs = cfg.lastRunAt ? Date.parse(cfg.lastRunAt) : 0;
+      if (lastMs && Date.now() - lastMs < intervalMs) {
+        return { skipped: true, reason: 'interval_not_elapsed' };
+      }
+      const result = await this.hunter.runCycle({ forceManual: false });
+      this._failures = 0;
+      this._retryAt = 0;
+      return result;
+    } catch (err) {
+      this._failures++;
+      this._retryAt = Date.now() + Math.min(15 * 60 * 1000, 60 * 1000 * 2 ** Math.min(this._failures - 1, 4));
+      throw err;
+    } finally {
+      this._inFlight = false;
     }
-    return this.hunter.runCycle({ forceManual: false });
   }
 
   stop() {

@@ -324,6 +324,10 @@ class ShopeeClient {
           if (json && Array.isArray(json.errors) && json.errors.length > 0) {
             const firstErr = json.errors[0] || {};
             const code = String(firstErr?.extensions?.code || firstErr?.code || '').trim();
+            if (code === '10000' && attempt < maxAttempts) {
+              await sleep(500 * attempt);
+              continue;
+            }
             const friendly = SHOPEE_ERROR_CODES[code] || `Erro oficial GraphQL da Shopee${code ? ` (${code})` : ''}.`;
             throw new ShopeeApiError(code || 'UPSTREAM_GRAPHQL', friendly, 400);
           }
