@@ -11,6 +11,16 @@ const crypto = require('crypto');
 const logger = require('../../utils/logger');
 const { sleep, randomDelay, formatMs } = require('../../utils/delay');
 
+function similarProductTitles(first, second) {
+  const tokens = title => new Set(String(title || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().match(/[a-z0-9]+/g)?.filter(word => word.length > 2) || []);
+  const left = tokens(first);
+  const right = tokens(second);
+  if (left.size < 3 || right.size < 3) return false;
+  const common = [...left].filter(word => right.has(word)).length;
+  return common / Math.max(left.size, right.size) >= 0.75;
+}
+
 function isPermanentSendError(err) {
   const msg = String(err?.message || '').toLowerCase();
   return (
@@ -107,6 +117,17 @@ class MessageDispatcher {
       const claimed = await this.repository.markJobProcessing(job.id);
       if (!claimed) {
         return { skipped: true, reason: 'already_claimed' };
+      }
+
+      if (claimed.offer_id && claimed.idempotency_key?.startsWith('hunter:')) {
+        const titles = await this.repository.getOfferTitlesForDestination(claimed.offer_id, dest, claimed.id);
+        if (titles.title && titles.previous.some(title => similarProductTitles(titles.title, title))) {
+          await this.repository.markJobFailed(claimed.id, {
+            errorMessage: 'Produto semelhante já enviado ou aguardando confirmação neste grupo.',
+            permanent: true,
+          });
+          return { skipped: true, reason: 'similar_product' };
+        }
       }
 
       const payload = claimed.payload_json || {};
@@ -239,4 +260,4 @@ class MessageDispatcher {
   }
 }
 
-module.exports = { MessageDispatcher, isPermanentSendError };
+module.exports = { MessageDispatcher, isPermanentSendError, similarProductTitles };

@@ -517,6 +517,26 @@ class Repository {
   }
 
   // ---------------- FILA DE MENSAGENS E PUBLICAÇÕES ----------------
+  async getOfferTitlesForDestination(offerId, destinationJid, jobId) {
+    if (this.usePg()) {
+      const current = await this.pg.query('SELECT title FROM offers WHERE id = $1', [offerId]);
+      const history = await this.pg.query(
+        `SELECT DISTINCT o.title FROM queue_jobs q JOIN offers o ON o.id = q.offer_id
+         WHERE q.destination_jid = $1 AND q.id <> $2
+           AND q.status IN ('sent', 'delivered', 'awaiting_receipt', 'processing')`,
+        [destinationJid, jobId]
+      );
+      return { title: current.rows[0]?.title || '', previous: history.rows.map(row => row.title) };
+    }
+    const title = this._memory.offers.find(offer => offer.id === offerId)?.title || '';
+    const previous = this._memory.queueJobs
+      .filter(job => job.id !== jobId && job.destination_jid === destinationJid &&
+        ['sent', 'delivered', 'awaiting_receipt', 'processing'].includes(job.status))
+      .map(job => this._memory.offers.find(offer => offer.id === job.offer_id)?.title)
+      .filter(Boolean);
+    return { title, previous };
+  }
+
   async enqueueJob({ idempotencyKey, offerId = null, destinationJid, payload, maxAttempts = 3 }) {
     if (this.usePg()) {
       const res = await this.pg.query(

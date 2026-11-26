@@ -118,3 +118,19 @@ test('reinício preserva oferta aguardando recibo sem recolocá-la na fila de en
   assert.equal((await s.repo.listReadyJobsByDestination()).length, 0);
   assert.equal(calls, 1);
 });
+
+test('produtos iguais de vendedores diferentes não são enviados novamente', async () => {
+  const { similarProductTitles } = require('../src/services/queue/dispatcher');
+  assert.equal(similarProductTitles('Cesto Organizador para Cozinha Mercado e Casa', 'Cesto Organizador para Cozinha Mercado e Casa'), true);
+  assert.equal(similarProductTitles('Cesto Organizador Cozinha com Tampa Grande', 'Cesto organizador cozinha com tampa grande promoção'), true);
+  assert.equal(similarProductTitles('Cesto Organizador Cozinha com Tampa Grande', 'Lápis de Cor Escolar 12 Cores'), false);
+  const s = await setup(async () => { throw new Error('Não deveria enviar produto repetido'); });
+  const prior = await s.repo.createOffer({ title: 'Cesto Organizador para Cozinha Mercado e Casa', sourceType: 'hunter', affiliateUrl: 'https://example.org/a', formattedMessage: 'Oferta', dedupHash: 'a' });
+  const current = await s.repo.createOffer({ title: 'Cesto Organizador para Cozinha Mercado e Casa', sourceType: 'hunter', affiliateUrl: 'https://example.org/b', formattedMessage: 'Oferta', dedupHash: 'b' });
+  const old = await s.repo.enqueueJob({ offerId: prior.id, destinationJid: group, payload: {text: 'Oferta'}, idempotencyKey: 'old' });
+  await s.repo.markJobSent(old.job.id, 'old-message');
+  s.repo._memory.queueJobs[0].offer_id = current.id;
+  await s.process();
+  assert.equal(s.repo._memory.queueJobs[0].status, 'dead_letter');
+  assert.match(s.repo._memory.queueJobs[0].last_error, /semelhante/);
+});
