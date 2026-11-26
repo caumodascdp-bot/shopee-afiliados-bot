@@ -607,6 +607,29 @@ class Repository {
       .map((j) => ({ ...j }));
   }
 
+  async deferJobUntilDestinationInterval(jobId, destinationJid, intervalMs) {
+    if (this.usePg()) {
+      const result = await this.pg.query(
+        `UPDATE queue_jobs q SET next_attempt_at = latest.next_allowed, updated_at = NOW()
+         FROM (SELECT MAX(updated_at) + ($3 * interval '1 millisecond') AS next_allowed
+               FROM queue_jobs WHERE destination_jid = $2 AND id <> $1
+               AND status IN ('sent', 'delivered', 'awaiting_receipt')) latest
+         WHERE q.id = $1 AND q.status IN ('pending', 'failed') AND latest.next_allowed > NOW()
+         RETURNING q.id`,
+        [jobId, destinationJid, intervalMs]
+      );
+      return result.rowCount > 0;
+    }
+    const job = this._memory.queueJobs.find(item => item.id === jobId);
+    const latest = this._memory.queueJobs
+      .filter(item => item.id !== jobId && item.destination_jid === destinationJid &&
+        ['sent', 'delivered', 'awaiting_receipt'].includes(item.status))
+      .reduce((time, item) => Math.max(time, Date.parse(item.updated_at)), 0);
+    if (!job || latest + intervalMs <= Date.now()) return false;
+    job.next_attempt_at = new Date(latest + intervalMs).toISOString();
+    return true;
+  }
+
   async markJobProcessing(jobId) {
     if (this.usePg()) {
       const res = await this.pg.query(

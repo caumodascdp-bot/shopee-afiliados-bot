@@ -143,3 +143,13 @@ test('produto bloqueado não é enviado mesmo com outra oferta', async () => {
   assert.equal(s.repo._memory.queueJobs[0].status, 'dead_letter');
   assert.match(s.repo._memory.queueJobs[0].last_error, /bloqueado/);
 });
+
+test('fila mantém cinco minutos após envio anterior para o mesmo grupo', async () => {
+  const repository = new Repository();
+  const old = await repository.enqueueJob({destinationJid:group,payload:{text:'primeiro'},idempotencyKey:'old-interval'});
+  await repository.markJobSent(old.job.id, 'id');
+  const next = await repository.enqueueJob({destinationJid:group,payload:{text:'segundo'},idempotencyKey:'next-interval'});
+  assert.equal(await repository.deferJobUntilDestinationInterval(next.job.id, group, 300000), true);
+  assert.ok(Date.parse(repository._memory.queueJobs[1].next_attempt_at) > Date.now() + 290000);
+  assert.equal(await repository.deferJobUntilDestinationInterval(next.job.id, 'other@g.us', 300000), false);
+});

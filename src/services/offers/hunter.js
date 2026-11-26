@@ -115,7 +115,7 @@ class OfferHunter {
           res = await this.shopee.searchProducts({
             keyword: kw.keyword,
             page: 1,
-            limit: 20,
+            limit: 50,
             sortType: cfg.sortType,
             useCache: true,
           });

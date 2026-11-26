@@ -114,6 +114,11 @@ class MessageDispatcher {
         return { skipped: true, reason: 'rate_limit_minute' };
       }
 
+      if (!skipDelay && job.idempotency_key?.startsWith('hunter:') &&
+          await this.repository.deferJobUntilDestinationInterval(job.id, dest, 5 * 60 * 1000)) {
+        return { skipped: true, reason: 'destination_interval' };
+      }
+
       const claimed = await this.repository.markJobProcessing(job.id);
       if (!claimed) {
         return { skipped: true, reason: 'already_claimed' };
