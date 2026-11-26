@@ -134,3 +134,12 @@ test('produtos iguais de vendedores diferentes não são enviados novamente', as
   assert.equal(s.repo._memory.queueJobs[0].status, 'dead_letter');
   assert.match(s.repo._memory.queueJobs[0].last_error, /semelhante/);
 });
+
+test('produto bloqueado não é enviado mesmo com outra oferta', async () => {
+  const s = await setup(async () => { throw new Error('Produto bloqueado não deve ser enviado'); });
+  await s.repo.setSetting('blocked_product_terms', ['formex']);
+  s.repo._memory.queueJobs[0].payload_json.text = 'Oferta FORMEX de outro vendedor';
+  await s.process();
+  assert.equal(s.repo._memory.queueJobs[0].status, 'dead_letter');
+  assert.match(s.repo._memory.queueJobs[0].last_error, /bloqueado/);
+});

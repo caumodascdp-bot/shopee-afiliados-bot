@@ -102,6 +102,7 @@ class OfferHunter {
         return { skipped: true, reason: 'no_keywords', found: 0, enqueued: 0 };
       }
 
+      const blockedTerms = await this.repository.getSetting('blocked_product_terms', []);
       const candidates = [];
       const seenItems = new Set();
 
@@ -116,6 +117,7 @@ class OfferHunter {
         for (const p of res.offers || []) {
           const itemKey = `${p.shopId}:${p.itemId}`;
           if (seenItems.has(itemKey)) continue;
+          if (blockedTerms.some(term => String(p.title || '').toLowerCase().includes(String(term).toLowerCase()))) continue;
           if (!this._matchesFilters(p, cfg, kw)) continue;
           seenItems.add(itemKey);
           candidates.push({ product: p, keyword: kw.keyword, score: scoreOffer(p) });

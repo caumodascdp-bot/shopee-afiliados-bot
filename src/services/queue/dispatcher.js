@@ -132,6 +132,15 @@ class MessageDispatcher {
 
       const payload = claimed.payload_json || {};
       const text = String(payload.text || '').trim();
+      const blockedTerms = await this.repository.getSetting('blocked_product_terms', []);
+      if (blockedTerms.some(term => term && text.toLowerCase().includes(String(term).toLowerCase()))) {
+        await this.repository.markJobFailed(claimed.id, {
+          errorMessage: 'Produto bloqueado pela proprietária.',
+          permanent: true,
+        });
+        return { skipped: true, reason: 'blocked_product' };
+      }
+
       if (!text) {
         await this.repository.markJobFailed(claimed.id, {
           errorMessage: 'Texto da oferta vazio.',
