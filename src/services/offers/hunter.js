@@ -18,7 +18,7 @@ const DEFAULT_HUNTER_CONFIG = {
   maxPerRun: 3,
   sortType: 5, // 5 = maior comissão na API Shopee
   destinationJids: [],
-  subId: 'cacador_auto',
+  subId: 'cacadorauto',
   lastRunAt: null,
   lastRunSummary: null,
 };
@@ -106,14 +106,23 @@ class OfferHunter {
       const candidates = [];
       const seenItems = new Set();
 
+      let searchFailures = 0;
       for (const kw of activeKeywords) {
-        const res = await this.shopee.searchProducts({
-          keyword: kw.keyword,
-          page: 1,
-          limit: 20,
-          sortType: cfg.sortType,
-          useCache: true,
-        });
+        let res;
+        try {
+          res = await this.shopee.searchProducts({
+            keyword: kw.keyword,
+            page: 1,
+            limit: 20,
+            sortType: cfg.sortType,
+            useCache: true,
+          });
+        } catch (err) {
+          if (String(err.code) !== '10000') throw err;
+          searchFailures++;
+          logger.warn(`[CACADOR] Busca indisponível para ${kw.keyword}: ${err.message}`);
+          continue;
+        }
         for (const p of res.offers || []) {
           const itemKey = `${p.shopId}:${p.itemId}`;
           if (seenItems.has(itemKey)) continue;
@@ -122,6 +131,10 @@ class OfferHunter {
           seenItems.add(itemKey);
           candidates.push({ product: p, keyword: kw.keyword, score: scoreOffer(p) });
         }
+      }
+
+      if (searchFailures === activeKeywords.length) {
+        throw new Error('Todas as buscas falharam na Shopee.');
       }
 
       candidates.sort((a, b) => b.score - a.score);

@@ -169,3 +169,19 @@ test('Conversor Rápido: converte via painel e responde no privado do WhatsApp q
   const history = await repository.listConversions();
   assert.equal(history.length, 2);
 });
+
+test('erro interno em uma palavra-chave não interrompe as demais buscas', async () => {
+  const repository = new Repository();
+  await repository.addHunterKeyword({ keyword: 'falha' });
+  await repository.addHunterKeyword({ keyword: 'ok' });
+  const shopeeClient = {
+    async searchProducts({ keyword }) {
+      if (keyword === 'falha') { const err = new Error('erro interno'); err.code = '10000'; throw err; }
+      return { offers: [] };
+    },
+  };
+  const hunter = new OfferHunter({ repository, shopeeClient });
+  const result = await hunter.runCycle({ forceManual: true });
+  assert.equal(result.keywordsChecked, 2);
+  assert.equal(result.candidatesFound, 0);
+});
