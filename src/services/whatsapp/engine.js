@@ -473,7 +473,7 @@ class WhatsAppEngine extends EventEmitter {
     } catch (_) {}
   }
 
-  async prepareGroupText(jid) {
+  async prepareGroupText(jid, imageSource = null) {
     const sock = this.sock;
     if (!sock || this.status !== 'CONNECTED') throw new Error('WhatsApp desconectado.');
     const metadata = await sock.groupMetadata(jid);
@@ -484,9 +484,16 @@ class WhatsAppEngine extends EventEmitter {
     if (metadata.announce && !['admin', 'superadmin'].includes(member?.admin)) {
       throw new Error('Envio não permitido: grupo exclusivo para administradores.');
     }
+    let image;
+    if (Buffer.isBuffer(imageSource)) {
+      image = imageSource;
+    } else if (imageSource) {
+      image = { url: validateAllowedHttpsUrl(imageSource, IMAGE_ALLOWED_HOSTS, { allowSuffixes: IMAGE_ALLOWED_SUFFIXES }) };
+    }
     const messageId = this.baileysLoader().generateMessageIDV2(sock.user?.id);
     return { messageId, send: async text => {
-      const sent = await sock.sendMessage(jid, { text, linkPreview: null }, { messageId });
+      const content = image ? { image, caption: text } : { text, linkPreview: null };
+      const sent = await sock.sendMessage(jid, content, { messageId });
       if (sent?.key?.id !== messageId) throw new Error('Resposta sem o identificador reservado.');
       this._markSentId(messageId);
     } };

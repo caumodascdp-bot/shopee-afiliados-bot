@@ -14,6 +14,10 @@ test('Caçador Automático: não dispara sem ativação, aplica filtros reais e 
   const dispatcher = new MessageDispatcher({ repository, redis, whatsapp: { status: 'OFFLINE' } });
 
   const shopeeMock = {
+    async generateShortLink({ originUrl }) {
+      assert.equal(originUrl, 'https://shopee.com.br/product/10/2');
+      return { shortLink: 'https://s.shopee.com.br/affiliate-test' };
+    },
     async searchProducts() {
       return {
         offers: [
@@ -70,6 +74,7 @@ test('Caçador Automático: não dispara sem ativação, aplica filtros reais e 
   assert.equal(res1.offersSelected, 1);
   assert.equal(res1.enqueued, 1);
   assert.equal(res1.offers[0].title, 'Cafeteira Elétrica Top');
+  assert.equal(res1.offers[0].affiliate_url, 'https://s.shopee.com.br/affiliate-test');
 
   // Segunda execução: mesmo produto não repete
   const res2 = await hunter.runCycle({ forceManual: false });

@@ -124,10 +124,11 @@ class MessageDispatcher {
         await this.whatsapp.sendTyping(dest, Math.min(typingMs, 3000));
       }
 
-      // As ofertas do caçador usam texto com link e recibo por grupo.
+      // As ofertas do caçador aguardam recibo de entrega do grupo.
       const verified = claimed.idempotency_key?.startsWith('hunter:') && dest.endsWith('@g.us');
       if (verified) {
-        const submission = await this.whatsapp.prepareGroupText(dest);
+        const image = payload.imageBase64 ? Buffer.from(payload.imageBase64, 'base64') : payload.imageUrl;
+        const submission = await this.whatsapp.prepareGroupText(dest, image);
         if (!await this.repository.reserveWhatsAppMessage(claimed.id, submission.messageId)) {
           return { skipped: true, reason: 'already_reserved' };
         }

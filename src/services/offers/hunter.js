@@ -151,14 +151,11 @@ class OfferHunter {
 
       for (const item of selected) {
         const p = item.product;
-        let shortLink = p.offerLink || '';
-        if (!shortLink) {
-          const linkRes = await this.shopee.generateShortLink({
-            originUrl: p.productUrl,
-            subIds: cfg.subId ? [cfg.subId] : [],
-          });
-          shortLink = linkRes.shortLink;
-        }
+        const linkRes = await this.shopee.generateShortLink({
+          originUrl: p.productUrl,
+          subIds: cfg.subId ? [cfg.subId] : [],
+        });
+        const shortLink = linkRes.shortLink;
 
         const savedProd = await this.repository.upsertProduct({
           ...p,

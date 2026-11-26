@@ -18,15 +18,15 @@ async function setup(send, announce = false) {
   };
   engine.inspectGroup = groupDiagnostics(sock, {info(){},warn(){}}, repo);
   const queue = new MessageDispatcher({ repository: repo, whatsapp: engine });
-  await queue.enqueue({ destinationJid: group, text: 'Oferta https://example.org', imageUrl: 'https://example.org/image', idempotencyKey: 'hunter:1:' + group });
+  await queue.enqueue({ destinationJid: group, text: 'Oferta https://example.org', imageUrl: 'https://down-br.img.susercontent.com/image', idempotencyKey: 'hunter:1:' + group });
   return {repo, sock, queue, process: () => queue.processPendingBatch({ skipDelay: true })};
 }
 
 test('oferta em texto só recebe confirmação para o ID e grupo corretos, mesmo antes do retorno', async () => {
   const s = await setup(async (jid, content, opts) => {
     assert.equal(jid, group);
-    assert.equal(content.text, 'Oferta https://example.org');
-    assert.equal(content.image, undefined);
+    assert.equal(content.caption, 'Oferta https://example.org');
+    assert.deepEqual(content.image, { url: 'https://down-br.img.susercontent.com/image' });
     const key = { remoteJid: group, fromMe: true, id: opts.messageId };
     function receipt(k) { s.sock.ev.emit('message-receipt.update', [{ key: k, receipt: { userJid: '300@lid', receiptTimestamp: 1 } }]); }
     receipt({...key,remoteJid:'7654321@g.us'});
@@ -74,4 +74,47 @@ test('recusa posterior à submissão é registrada com o código do WhatsApp', a
   s.sock.ev.emit('messages.update',[{key,update:{status:0,messageStubParameters:['403']}}]);
   assert.equal((await s.repo.getQueueStats()).dead_letter, 1);
   assert.match((await s.repo.listPublications())[0].error_message,/403/);
+});
+
+test('recusa 421 é correlacionada ao ID e grupo e não é reenviada automaticamente', async () => {
+  const s = await setup(async (jid, content, opts) => ({
+    key: { remoteJid: jid, fromMe: true, id: opts.messageId },
+  }));
+  await s.process();
+  const job = s.repo._memory.queueJobs[0];
+  s.sock.ev.emit('messages.update', [{
+    key: { remoteJid: group, fromMe: true, id: job.whatsapp_message_id },
+    update: { status: 0, messageStubParameters: ['421'] },
+  }]);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(job.status, 'dead_letter');
+  assert.match(job.last_error, /421/);
+  assert.equal((await s.repo.listPublications())[0].whatsapp_msg_id, job.whatsapp_message_id);
+  await s.queue.init();
+  await s.process();
+  assert.equal((await s.repo.getQueueStats()).dead_letter, 1);
+});
+
+test('recibo da oferta 23 não confirma outra oferta do mesmo grupo', async () => {
+  const s = await setup(async (jid, content, opts) => ({key: {remoteJid: jid, fromMe: true, id: opts.messageId}}));
+  await s.process();
+  const original = s.repo._memory.queueJobs[0];
+  const second = await s.repo.enqueueJob({
+    idempotencyKey: 'hunter:2:' + group, destinationJid: group, payload: {text: 'Oferta 2'},
+  });
+  await s.repo.markJobProcessing(second.job.id);
+  await s.repo.reserveWhatsAppMessage(second.job.id, 'message-23');
+  assert.equal(await s.repo.recordWhatsAppReceipt(group, 'message-23'), true);
+  assert.equal(original.status, 'awaiting_receipt');
+  assert.equal((await s.repo.getQueueStats()).delivered, 1);
+  assert.equal((await s.repo.getQueueStats()).awaiting_receipt, 1);
+});
+
+test('reinício preserva oferta aguardando recibo sem recolocá-la na fila de envio', async () => {
+  let calls = 0;
+  const s = await setup(async () => { calls++; return {key:{id:'msg'}}; });
+  await s.process();
+  assert.equal(await s.repo.recoverStaleProcessingJobs(), 0);
+  assert.equal((await s.repo.listReadyJobsByDestination()).length, 0);
+  assert.equal(calls, 1);
 });
