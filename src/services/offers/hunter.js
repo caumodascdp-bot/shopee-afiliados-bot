@@ -7,6 +7,7 @@
 const crypto = require('crypto');
 const logger = require('../../utils/logger');
 const { formatOfferMessage, scoreOffer } = require('../shopee/formatter');
+const { similarProductTitles } = require('../queue/dispatcher');
 
 const DEFAULT_HUNTER_CONFIG = {
   enabled: false,
@@ -88,6 +89,7 @@ class OfferHunter {
       return { skipped: true, reason: 'hunter_disabled' };
     }
 
+    const cycleStartedAt = new Date().toISOString();
     const lockKey = 'lock:hunter_cycle';
     const lockToken = `${process.pid}-${Date.now()}`;
     if (this.redis) {
@@ -139,6 +141,15 @@ class OfferHunter {
 
       candidates.sort((a, b) => b.score - a.score);
 
+      const destinations =
+        cfg.destinationJids && cfg.destinationJids.length > 0
+          ? cfg.destinationJids
+          : (await this.repository.listWhatsAppGroups()).filter((g) => g.is_destination).map((g) => g.jid);
+      const previousTitles = await Promise.all(destinations.map(async jid => {
+        const result = await this.repository.getOfferTitlesForDestination(null, jid, 0);
+        return result.previous;
+      }));
+
       const selected = [];
       for (const cand of candidates) {
         if (selected.length >= cfg.maxPerRun) break;
@@ -149,13 +160,11 @@ class OfferHunter {
 
         const dup = await this.repository.hasRecentOfferByHash(dedupHash, 24);
         if (dup) continue;
+        if (selected.some(item => similarProductTitles(item.product.title, cand.product.title))) continue;
+        if (previousTitles.length && previousTitles.every(titles =>
+          titles.some(title => similarProductTitles(title, cand.product.title)))) continue;
         selected.push({ ...cand, dedupHash });
       }
-
-      const destinations =
-        cfg.destinationJids && cfg.destinationJids.length > 0
-          ? cfg.destinationJids
-          : (await this.repository.listWhatsAppGroups()).filter((g) => g.is_destination).map((g) => g.jid);
 
       if (cfg.enabled && destinations.length === 0 && selected.length > 0) {
         logger.warn('[CACADOR] Nenhum grupo de destino configurado; ofertas serão salvas sem envios.');
@@ -218,7 +227,7 @@ class OfferHunter {
       };
       await this.repository.setSetting('hunter_config', {
         ...cfg,
-        lastRunAt: summary.ranAt,
+        lastRunAt: cycleStartedAt,
         lastRunSummary: summary,
       });
 

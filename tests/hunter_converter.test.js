@@ -185,3 +185,26 @@ test('erro interno em uma palavra-chave não interrompe as demais buscas', async
   assert.equal(result.keywordsChecked, 2);
   assert.equal(result.candidatesFound, 0);
 });
+
+test('caçador escolhe outra oferta quando a primeira é semelhante à enviada', async () => {
+  const repository = new Repository();
+  const destinationJid = '123456789@g.us';
+  await repository.updateWhatsAppGroupConfig(destinationJid, {name: 'Destino', isDestination: true});
+  await repository.addHunterKeyword({keyword: 'teste'});
+  const previous = await repository.createOffer({title: 'Cesto Organizador para Cozinha e Banheiro', sourceType: 'hunter', affiliateUrl: 'https://example.org/old', formattedMessage: 'antigo', dedupHash: 'old'});
+  const oldJob = await repository.enqueueJob({offerId: previous.id, destinationJid, payload: {text:'antigo'}, idempotencyKey:'previous'});
+  await repository.markJobSent(oldJob.job.id, 'message');
+  const shopeeClient = {
+    async searchProducts() { return {offers: [
+      {itemId:'1',shopId:'1',title:'Cesto Organizador para Cozinha e Banheiro',priceMin:20,commissionRate:0.2,productUrl:'https://shopee.com.br/product/1/1'},
+      {itemId:'2',shopId:'2',title:'Fone Bluetooth Estéreo Sem Fio Recarregável',priceMin:30,commissionRate:0.1,productUrl:'https://shopee.com.br/product/2/2'},
+    ]}; },
+    async generateShortLink() { return {shortLink:'https://s.shopee.com.br/teste'}; },
+  };
+  const dispatcher = new MessageDispatcher({repository});
+  const hunter = new OfferHunter({repository, shopeeClient, dispatcher});
+  await hunter.saveConfig({enabled:true, maxPerRun:1});
+  const result = await hunter.runCycle();
+  assert.equal(result.offers[0].title, 'Fone Bluetooth Estéreo Sem Fio Recarregável');
+  assert.equal(result.enqueued, 1);
+});
