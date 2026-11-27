@@ -105,16 +105,18 @@ class OfferHunter {
       }
 
       const blockedTerms = await this.repository.getSetting('blocked_product_terms', []);
+      const searchPages = await this.repository.getSetting('hunter_search_pages', {});
       const candidates = [];
       const seenItems = new Set();
 
       let searchFailures = 0;
       for (const kw of activeKeywords) {
         let res;
+        const page = Math.max(1, Number.parseInt(searchPages[kw.id], 10) || 1);
         try {
           res = await this.shopee.searchProducts({
             keyword: kw.keyword,
-            page: 1,
+            page,
             limit: 50,
             sortType: cfg.sortType,
             useCache: true,
@@ -125,6 +127,7 @@ class OfferHunter {
           logger.warn(`[CACADOR] Busca indisponível para ${kw.keyword}: ${err.message}`);
           continue;
         }
+        searchPages[kw.id] = res.pageInfo?.hasNextPage ? page + 1 : 1;
         for (const p of res.offers || []) {
           const itemKey = `${p.shopId}:${p.itemId}`;
           if (seenItems.has(itemKey)) continue;
@@ -139,6 +142,7 @@ class OfferHunter {
         throw new Error('Todas as buscas falharam na Shopee.');
       }
 
+      await this.repository.setSetting('hunter_search_pages', searchPages);
       candidates.sort((a, b) => b.score - a.score);
 
       const destinations =

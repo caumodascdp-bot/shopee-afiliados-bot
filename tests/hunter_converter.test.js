@@ -208,3 +208,19 @@ test('caçador escolhe outra oferta quando a primeira é semelhante à enviada',
   assert.equal(result.offers[0].title, 'Fone Bluetooth Estéreo Sem Fio Recarregável');
   assert.equal(result.enqueued, 1);
 });
+
+test('caçador avança páginas e retorna ao início ao terminar os resultados', async () => {
+  const repository = new Repository();
+  await repository.addHunterKeyword({keyword: 'organização'});
+  const pages = [];
+  const hunter = new OfferHunter({repository, shopeeClient: {
+    async searchProducts({page}) {
+      pages.push(page);
+      return {offers: [], pageInfo: {hasNextPage: page < 2}};
+    },
+  }});
+  await hunter.runCycle({forceManual: true});
+  await hunter.runCycle({forceManual: true});
+  await hunter.runCycle({forceManual: true});
+  assert.deepEqual(pages, [1, 2, 1]);
+});
